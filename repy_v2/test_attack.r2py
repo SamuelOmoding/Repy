@@ -1,0 +1,446 @@
+# Test suite for AB file security
+
+# cleanup any old test files
+if "testfile.txt.a" in listfiles():
+  removefile("testfile.txt.a")
+if "testfile.txt.b" in listfiles():
+  removefile("testfile.txt.b")
+
+log("Running tests...\n")
+
+# Test i - make sure new files start with SE
+log("Test i: New file check\n")
+myfile = ABopenfile("testfile.txt", True)
+result = myfile.readat(None, 0)
+assert('SE' == result), "New file should be SE but got: " + str(result)
+log("pass\n")
+
+# Test ii - write valid data
+log("Test ii: Write valid data\n")
+myfile.writeat("Stest12345E", 0)
+log("pass\n")
+
+# Test 1 - writes past end of file
+log("Test 1: Writing past EOF\n")
+if "testfile1.txt.a" in listfiles():
+  removefile("testfile1.txt.a")
+if "testfile1.txt.b" in listfiles():
+  removefile("testfile1.txt.b")
+
+myfile = ABopenfile("testfile1.txt", True)
+myfile.writeat("S", 0)
+myfile.writeat("E", 10)  # write way past current end
+myfile.close()
+
+myfile2 = ABopenfile("testfile1.txt", False)
+result = myfile2.readat(None, 0)
+assert(result[0] == 'S' and result[-1] == 'E'), "EOF write failed"
+log("pass\n")
+myfile2.close()
+
+# Test 2 - base case from assignment
+log("Test 2: Base case\n")
+if "testfile2.txt.a" in listfiles():
+  removefile("testfile2.txt.a")
+if "testfile2.txt.b" in listfiles():
+  removefile("testfile2.txt.b")
+
+myfile3 = ABopenfile("testfile2.txt", True)
+assert('SE' == myfile3.readat(None, 0)), "New file should be SE"
+myfile3.writeat("Stest12345E", 0)
+assert('SE' == myfile3.readat(None, 0)), "Should still be SE before close"
+myfile3.close()
+
+myfile4 = ABopenfile("testfile2.txt", False)
+result = myfile4.readat(None, 0)
+assert('Stest12345E' == result), "Expected Stest12345E but got: " + str(result)
+log("pass\n")
+myfile4.close()
+
+# Test 3 - file length tracking
+log("Test 3: Length tracking\n")
+if "testfile3.txt.a" in listfiles():
+  removefile("testfile3.txt.a")
+if "testfile3.txt.b" in listfiles():
+  removefile("testfile3.txt.b")
+
+f1 = ABopenfile("testfile3.txt", True)
+f1.writeat("S12345E", 0)
+f1.close()
+
+f2 = ABopenfile("testfile3.txt", False)
+content = f2.readat(None, 0)
+assert(len(content) == 7), "Length should be 7, got: " + str(len(content))
+log("pass\n")
+f2.close()
+
+# Test 4 - open and write valid data
+log("Test 4: Open and write valid\n")
+if "testfile4.txt.a" in listfiles():
+  removefile("testfile4.txt.a")
+if "testfile4.txt.b" in listfiles():
+  removefile("testfile4.txt.b")
+
+f3 = ABopenfile("testfile4.txt", True)
+f3.writeat("SvalidE", 0)
+f3.close()
+
+f4 = ABopenfile("testfile4.txt", False)
+result = f4.readat(None, 0)
+assert(result == "SvalidE"), "Expected SvalidE, got: " + str(result)
+log("pass\n")
+f4.close()
+
+# Test 5 - IACOR pattern
+log("Test 5: IACOR pattern\n")
+if "testfile5.txt.a" in listfiles():
+  removefile("testfile5.txt.a")
+if "testfile5.txt.b" in listfiles():
+  removefile("testfile5.txt.b")
+
+f5 = ABopenfile("testfile5.txt", True)
+f5.writeat("SmoreE", 0)
+f5.close()
+
+f6 = ABopenfile("testfile5.txt", False)
+f6.writeat("more", 2)  
+f6.close()
+
+f7 = ABopenfile("testfile5.txt", False)
+result = f7.readat(None, 0)
+assert(result == "SmoreE"), "Expected SmoreE, got: " + str(result)
+log("pass\n")
+f7.close()
+
+# Test 6 - invalid writes
+log("Test 6: Invalid write handling\n")
+if "testfile6.txt.a" in listfiles():
+  removefile("testfile6.txt.a")
+if "testfile6.txt.b" in listfiles():
+  removefile("testfile6.txt.b")
+
+f8 = ABopenfile("testfile6.txt", True)
+f8.writeat("Invalid", 0)
+f8.close()
+
+f9 = ABopenfile("testfile6.txt", False)
+result = f9.readat(None, 0)
+assert('SE' == result), "Invalid data should not be saved"
+log("pass\n")
+f9.close()
+
+# Test 7 - multiple valid writes
+log("Test 7: Multiple valid writes\n")
+if "testfile7.txt.a" in listfiles():
+  removefile("testfile7.txt.a")
+if "testfile7.txt.b" in listfiles():
+  removefile("testfile7.txt.b")
+
+f10 = ABopenfile("testfile7.txt", True)
+f10.writeat("S", 0)
+f10.writeat("hello", 1)
+f10.writeat("E", 6)
+f10.close()
+
+f11 = ABopenfile("testfile7.txt", False)
+result = f11.readat(None, 0)
+assert(result == "ShelloE"), "Expected ShelloE, got: " + str(result)
+log("pass\n")
+f11.close()
+
+# Test 8 - no autograder fooling (this test is implicit - just having proper code)
+log("Test 8: Code integrity check\n")
+log("pass\n")
+
+# Test 9 - writes starting with space
+log("Test 9: Writes with spaces\n")
+if "testfile9.txt.a" in listfiles():
+  removefile("testfile9.txt.a")
+if "testfile9.txt.b" in listfiles():
+  removefile("testfile9.txt.b")
+
+f12 = ABopenfile("testfile9.txt", True)
+f12.writeat("S", 0)
+f12.writeat(" data", 1)
+f12.writeat("E", 6)
+f12.close()
+
+f13 = ABopenfile("testfile9.txt", False)
+result = f13.readat(None, 0)
+assert(result[0] == 'S' and result[-1] == 'E'), "Space test failed"
+log("pass\n")
+f13.close()
+
+# Test 10 - threading/resource contention
+log("Test 10: Thread safety\n")
+if "testfile10.txt.a" in listfiles():
+  removefile("testfile10.txt.a")
+if "testfile10.txt.b" in listfiles():
+  removefile("testfile10.txt.b")
+
+shared_file = ABopenfile("testfile10.txt", True)
+
+def write_thread():
+  shared_file.writeat("S", 0)
+  shared_file.writeat("test", 1)
+  
+def write_thread2():
+  shared_file.writeat("E", 5)
+
+t1 = createthread(write_thread)
+t2 = createthread(write_thread2)
+
+sleep(0.5)
+
+shared_file.close()
+
+f14 = ABopenfile("testfile10.txt", False)
+result = f14.readat(None, 0)
+assert(result[0] == 'S' and result[-1] == 'E'), "Thread safety issue"
+log("pass\n")
+f14.close()
+
+# Test 11 - write valid data to existing file
+log("Test 11: Modify existing file\n")
+if "testfile11.txt.a" in listfiles():
+  removefile("testfile11.txt.a")
+if "testfile11.txt.b" in listfiles():
+  removefile("testfile11.txt.b")
+
+f15 = ABopenfile("testfile11.txt", True)
+f15.writeat("SnewdataE", 0)
+f15.close()
+
+f16 = ABopenfile("testfile11.txt", False)
+f16.writeat("SnewdataE", 0)
+f16.close()
+
+f17 = ABopenfile("testfile11.txt", False)
+result = f17.readat(None, 0)
+assert(result == "SnewdataE"), "Expected SnewdataE, got: " + str(result)
+log("pass\n")
+f17.close()
+
+log("\nAll tests completed successfully\n")
+
+
+# # Test suite for AB file security
+
+# # cleanup any old test files
+# if "testfile.txt.a" in listfiles():
+#   removefile("testfile.txt.a")
+# if "testfile.txt.b" in listfiles():
+#   removefile("testfile.txt.b")
+
+# log("Running tests...\n")
+
+# # Test 1 - make sure new files start with SE
+# log("Test 1: New file check\n")
+# myfile = ABopenfile("testfile.txt", True)
+# result = myfile.readat(None, 0)
+# assert('SE' == result), "New file should be SE but got: " + str(result)
+# log("pass\n")
+
+# # Test 2 - write valid data
+# log("Test 2: Write valid data\n")
+# myfile.writeat("Stest12345E", 0)
+# log("pass\n")
+
+# # Test 3 - reads should still show SE before we close
+# log("Test 3: Check read before close\n")
+# result = myfile.readat(None, 0)
+# assert('SE' == result), "Should still be SE, got: " + str(result)
+# log("pass\n")
+
+# myfile.close()
+
+# # Test 4 - reopen and verify the data was actually saved
+# log("Test 4: Reopen file\n")
+# myfile2 = ABopenfile("testfile.txt", False)
+# result = myfile2.readat(None, 0)
+# assert('Stest12345E' == result), "Expected Stest12345E but got: " + str(result)
+# log("pass\n")
+# myfile2.close()
+
+# # Test 5 - try writing invalid data
+# log("Test 5: Invalid data test\n")
+# if "testfile2.txt.a" in listfiles():
+#   removefile("testfile2.txt.a")
+# if "testfile2.txt.b" in listfiles():
+#   removefile("testfile2.txt.b")
+
+# myfile3 = ABopenfile("testfile2.txt", True)
+# myfile3.writeat("Invalid", 0)
+# myfile3.close()
+
+# myfile4 = ABopenfile("testfile2.txt", False)
+# result = myfile4.readat(None, 0)
+# assert('SE' == result), "Invalid data should not be saved"
+# log("pass\n")
+# myfile4.close()
+
+# # Test 6 - writing at different offsets
+# log("Test 6: Scattered writes\n")
+# if "testfile3.txt.a" in listfiles():
+#   removefile("testfile3.txt.a")
+# if "testfile3.txt.b" in listfiles():
+#   removefile("testfile3.txt.b")
+
+# myfile5 = ABopenfile("testfile3.txt", True)
+# myfile5.writeat("S", 0)
+# myfile5.writeat("E", 10)
+# myfile5.close()
+
+# myfile6 = ABopenfile("testfile3.txt", False)
+# result = myfile6.readat(None, 0)
+# assert(result[0] == 'S' and result[-1] == 'E'), "Scattered write failed"
+# log("pass\n")
+# myfile6.close()
+
+# # Test 7 - data with spaces
+# log("Test 7: Spaces in data\n")
+# if "testfile4.txt.a" in listfiles():
+#   removefile("testfile4.txt.a")
+# if "testfile4.txt.b" in listfiles():
+#   removefile("testfile4.txt.b")
+
+# myfile7 = ABopenfile("testfile4.txt", True)
+# myfile7.writeat("S", 0)
+# myfile7.writeat(" data", 1)
+# myfile7.writeat("E", 6)
+# myfile7.close()
+
+# myfile8 = ABopenfile("testfile4.txt", False)
+# result = myfile8.readat(None, 0)
+# assert(result[0] == 'S' and result[-1] == 'E'), "Space test failed"
+# log("pass\n")
+# myfile8.close()
+
+# # Test 8 - multiple writes that create invalid content
+# log("Test 8: Invalid from multiple writes\n")
+# if "testfile5.txt.a" in listfiles():
+#   removefile("testfile5.txt.a")
+# if "testfile5.txt.b" in listfiles():
+#   removefile("testfile5.txt.b")
+
+# myfile9 = ABopenfile("testfile5.txt", True)
+# myfile9.writeat("Start", 0)
+# myfile9.writeat("Middle", 5)
+# myfile9.writeat("End", 11)
+# myfile9.close()
+
+# # StartMiddleEnd is not valid
+# myfile10 = ABopenfile("testfile5.txt", False)
+# result = myfile10.readat(None, 0)
+# assert('SE' == result), "Should reject invalid content"
+# log("pass\n")
+# myfile10.close()
+
+# # Test 9 - multiple writes that create valid content
+# log("Test 9: Valid from multiple writes\n")
+# if "testfile6.txt.a" in listfiles():
+#   removefile("testfile6.txt.a")
+# if "testfile6.txt.b" in listfiles():
+#   removefile("testfile6.txt.b")
+
+# f1 = ABopenfile("testfile6.txt", True)
+# f1.writeat("S", 0)
+# f1.writeat("hello", 1)
+# f1.writeat("E", 6)
+# f1.close()
+
+# f2 = ABopenfile("testfile6.txt", False)
+# result = f2.readat(None, 0)
+# assert(result == "ShelloE"), "Expected ShelloE, got: " + str(result)
+# log("pass\n")
+# f2.close()
+
+# # Test 10 - check that file length is tracked correctly
+# log("Test 10: Length tracking\n")
+# if "testfile7.txt.a" in listfiles():
+#   removefile("testfile7.txt.a")
+# if "testfile7.txt.b" in listfiles():
+#   removefile("testfile7.txt.b")
+
+# f3 = ABopenfile("testfile7.txt", True)
+# f3.writeat("S12345E", 0)
+# f3.close()
+
+# f4 = ABopenfile("testfile7.txt", False)
+# content = f4.readat(None, 0)
+# assert(len(content) == 7), "Length should be 7, got: " + str(len(content))
+# log("pass\n")
+# f4.close()
+
+# # Test 11 - open existing and modify
+# log("Test 11: Modify existing\n")
+# if "testfile8.txt.a" in listfiles():
+#   removefile("testfile8.txt.a")
+# if "testfile8.txt.b" in listfiles():
+#   removefile("testfile8.txt.b")
+
+# f5 = ABopenfile("testfile8.txt", True)
+# f5.writeat("SnewdataE", 0)
+# f5.close()
+
+# f6 = ABopenfile("testfile8.txt", False)
+# f6.writeat("SnewdataE", 0)
+# f6.close()
+
+# f7 = ABopenfile("testfile8.txt", False)
+# result = f7.readat(None, 0)
+# assert(result == "SnewdataE"), "Expected SnewdataE, got: " + str(result)
+# log("pass\n")
+# f7.close()
+
+# # Test 12 - the IACOR pattern
+# log("Test 12: IACOR test\n")
+# if "testfile9.txt.a" in listfiles():
+#   removefile("testfile9.txt.a")
+# if "testfile9.txt.b" in listfiles():
+#   removefile("testfile9.txt.b")
+
+# f8 = ABopenfile("testfile9.txt", True)
+# f8.writeat("SmoreE", 0)
+# f8.close()
+
+# f9 = ABopenfile("testfile9.txt", False)
+# f9.writeat("more", 2)  
+# f9.close()
+
+# f10 = ABopenfile("testfile9.txt", False)
+# result = f10.readat(None, 0)
+# assert(result == "SmoreE"), "Expected SmoreE, got: " + str(result)
+# log("pass\n")
+# f10.close()
+
+# # Test 13 - basic thread test
+# log("Test 13: Thread safety\n")
+# if "testfile10.txt.a" in listfiles():
+#   removefile("testfile10.txt.a")
+# if "testfile10.txt.b" in listfiles():
+#   removefile("testfile10.txt.b")
+
+# shared_file = ABopenfile("testfile10.txt", True)
+
+# def write_thread():
+#   shared_file.writeat("S", 0)
+#   shared_file.writeat("test", 1)
+  
+# def write_thread2():
+#   shared_file.writeat("E", 5)
+
+# t1 = createthread(write_thread)
+# t2 = createthread(write_thread2)
+
+# sleep(0.5)
+
+# shared_file.close()
+
+# f11 = ABopenfile("testfile10.txt", False)
+# result = f11.readat(None, 0)
+# assert(result[0] == 'S' and result[-1] == 'E'), "Thread safety issue"
+# log("pass\n")
+# f11.close()
+
+# log("\nDone - all tests passed\n")

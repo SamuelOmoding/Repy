@@ -1,0 +1,135 @@
+"""
+This security layer implements A/B storage for files in RepyV2.
+File CONTENTS must start with 'S' and end with 'E' to be valid.
+"""
+
+TYPE="type"
+ARGS="args"
+RETURN="return"
+EXCP="exceptions"
+TARGET="target"
+FUNC="func"
+OBJC="objc"
+
+class ABFile():
+  def __init__(self, filename, create):
+    # Store the base filename
+    self.filename = filename
+    self.Afn = filename + '.a'
+    self.Bfn = filename + '.b'
+    
+    # Initialize file handles
+    self.Afile = None
+    self.Bfile = None
+    
+    if create:
+      # Create mode: make both files
+      # .a file starts with valid content "SE"
+      self.Afile = openfile(self.Afn, True)
+      self.Afile.writeat('SE', 0)
+      
+      # .b file starts empty (for writing)
+      self.Bfile = openfile(self.Bfn, True)
+    else:
+      # Open existing files
+      # Try to open .a (backup/read file)
+      try:
+        self.Afile = openfile(self.Afn, False)
+      except:
+        # If .a doesn't exist, create it with valid content
+        self.Afile = openfile(self.Afn, True)
+        self.Afile.writeat('SE', 0)
+      
+      # Try to open .b (write file)
+      try:
+        self.Bfile = openfile(self.Bfn, False)
+      except:
+        # If .b doesn't exist, create it empty
+        self.Bfile = openfile(self.Bfn, True)
+
+  def writeat(self, data, offset):
+    """
+    Write data to the .b file (working copy).
+    All writes go to .b, even if they would make the file invalid.
+    """
+    # Perform the write on the B file
+    self.Bfile.writeat(data, offset)
+    
+  def readat(self, bytes, offset):
+    """
+    Read from the .a file (backup/valid copy).
+    All reads come from .a.
+    """
+    return self.Afile.readat(bytes, offset)
+
+  def close(self):
+    """
+    On close, check if .b is valid (starts with 'S', ends with 'E').
+    If valid, copy .b content to .a.
+    If invalid, don't update .a (keep the old backup).
+    """
+    # Read the entire content of .b file
+    try:
+      # Read from beginning to get all content
+      # Use None to read everything, or a large number as fallback
+      try:
+        b_content = self.Bfile.readat(None, 0)
+      except:
+        # Some implementations need a size, use large number
+        b_content = self.Bfile.readat(100000000, 0)
+    except:
+      # If we can't read .b, just close both files
+      self.Afile.close()
+      self.Bfile.close()
+      return
+    
+    # Check if .b content is valid (starts with 'S' and ends with 'E')
+    is_valid = False
+    if len(b_content) >= 2:
+      if b_content[0] == 'S' and b_content[-1] == 'E':
+        is_valid = True
+    elif len(b_content) == 1:
+      # Edge case: single character - cannot be valid (need both S and E)
+      is_valid = False
+    
+    # If .b is valid, update .a with .b's content
+    if is_valid:
+      # Close current .a file
+      self.Afile.close()
+      
+      # Reopen .a in create mode to overwrite it
+      self.Afile = openfile(self.Afn, True)
+      
+      # Write .b's content to .a
+      self.Afile.writeat(b_content, 0)
+      
+      # Close the new .a file
+      self.Afile.close()
+    else:
+      # .b is invalid, just close .a without updating
+      self.Afile.close()
+    
+    # Always close .b file
+    self.Bfile.close()
+
+
+def ABopenfile(filename, create):
+  """
+  Opens an AB file with the given filename.
+  """
+  return ABFile(filename, create)
+
+
+# The code here sets up type checking and variable hiding for you.
+# You should not need to change anything below here.
+sec_file_def = {"obj-type":ABFile,
+                "name":"ABFile",
+                "writeat":{"type":"func","args":(str,int),"exceptions":Exception,"return":(int,type(None)),"target":ABFile.writeat},
+                "readat":{"type":"func","args":((int,type(None)),(int)),"exceptions":Exception,"return":str,"target":ABFile.readat},
+                "close":{"type":"func","args":None,"exceptions":None,"return":(bool,type(None)),"target":ABFile.close}
+           }
+
+CHILD_CONTEXT_DEF["ABopenfile"] = {TYPE:OBJC,ARGS:(str,bool),EXCP:Exception,RETURN:sec_file_def,TARGET:ABopenfile}
+
+# Execute the user code
+secure_dispatch_module()

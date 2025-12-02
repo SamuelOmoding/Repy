@@ -1,0 +1,17 @@
+if callfunc == 'initialize':
+  log("Test starting...\n")
+  
+  # Clean up
+  if "test.txt.a" in listfiles():
+    removefile("test.txt.a")
+  if "test.txt.b" in listfiles():
+    removefile("test.txt.b")
+  
+  # Simple test - just create and close
+  log("Creating file...\n")
+  f = openfile("test.txt", True)
+  f.writeat("Hello", 0)
+  f.close()
+  log("File created successfully!\n")
+  
+  log("Test complete!\n")

@@ -1,0 +1,69 @@
+# Test Case 1: Basic functionality test from assignment
+# Clean up any existing test files
+if "testfile.txt.a" in listfiles():
+  removefile("testfile.txt.a")
+if "testfile.txt.b" in listfiles():
+  removefile("testfile.txt.b")
+
+# Create a new AB file
+myfile = ABopenfile("testfile.txt", True)
+
+# Test 1: Reading a newly created file should return 'SE'
+result = myfile.readat(None, 0)
+assert('SE' == result), "Test 1 Failed: New file should contain 'SE', got: " + str(result)
+log("Test 1 Passed: New file contains 'SE'\n")
+
+# Test 2: Write valid data
+myfile.writeat("Stest12345E", 0)
+
+# Test 3: Should still read 'SE' because file hasn't been closed yet
+result = myfile.readat(None, 0)
+assert('SE' == result), "Test 3 Failed: Should still read 'SE' before close, got: " + str(result)
+log("Test 3 Passed: Still reading from backup before close\n")
+
+# Close the file (should update .a with valid data)
+myfile.close()
+
+# Test 4: Reopen and verify valid data was saved
+myfile2 = ABopenfile("testfile.txt", False)
+result = myfile2.readat(None, 0)
+assert('Stest12345E' == result), "Test 4 Failed: Should read 'Stest12345E', got: " + str(result)
+log("Test 4 Passed: Valid data saved correctly\n")
+myfile2.close()
+
+# Test 5: Test invalid write (doesn't start with S)
+if "testfile2.txt.a" in listfiles():
+  removefile("testfile2.txt.a")
+if "testfile2.txt.b" in listfiles():
+  removefile("testfile2.txt.b")
+
+myfile3 = ABopenfile("testfile2.txt", True)
+myfile3.writeat("Invalid", 0)
+myfile3.close()
+
+# Should still have 'SE' because invalid data wasn't saved
+myfile4 = ABopenfile("testfile2.txt", False)
+result = myfile4.readat(None, 0)
+assert('SE' == result), "Test 5 Failed: Invalid write should not update backup, got: " + str(result)
+log("Test 5 Passed: Invalid data rejected correctly\n")
+myfile4.close()
+
+# Test 6: Test valid write that ends with E but has content
+if "testfile3.txt.a" in listfiles():
+  removefile("testfile3.txt.a")
+if "testfile3.txt.b" in listfiles():
+  removefile("testfile3.txt.b")
+
+myfile5 = ABopenfile("testfile3.txt", True)
+myfile5.writeat("S", 0)
+myfile5.writeat("E", 10)
+myfile5.close()
+
+myfile6 = ABopenfile("testfile3.txt", False)
+result = myfile6.readat(None, 0)
+# Should have updated because it starts with S and ends with E
+assert(result[0] == 'S' and result[-1] == 'E'), "Test 6 Failed: Valid scattered write should save"
+log("Test 6 Passed: Scattered valid write works\n")
+myfile6.close()
+
+log("\n=== ALL TESTS PASSED ===\n")

@@ -1,0 +1,195 @@
+"""
+This is the A/B file security layer implemented in storage.
+It ensures files are only saved if they start with 'S' and end with 'E'.
+Maintains two files per logical file: .a (backup) and .b (write target).
+"""
+TYPE="type"
+ARGS="args"
+RETURN="return"
+EXCP="exceptions"
+TARGET="target"
+FUNC="func"
+OBJC="objc"
+
+def sanitize_name(name):
+  """Sanitize filename - remove dangerous characters"""
+  try:
+    if name is None or not isinstance(name, str):
+      return None
+    if '/' in name or '\\' in name or '\x00' in name:
+      return None
+    return name
+  except Exception:
+    return None
+
+def content_is_valid(s):
+  """Check if CONTENT (not filename!) is valid"""
+  try:
+    if not isinstance(s, str):
+      return False
+    if len(s) < 2:
+      return False
+    return s[0] == 'S' and s[-1] == 'E'
+  except Exception:
+    return False
+
+
+class ABFile():
+  def __init__(self, filename, create):
+    """Initialize AB file pair"""
+    self.Afn = filename + ".a"
+    self.Bfn = filename + ".b"
+    self.Afile = None
+    self.Bfile = None
+    self.closed = False
+    self.lock = createlock()
+    
+    if create:
+      # Create mode: create .a with 'SE' and empty .b
+      self.Afile = openfile(self.Afn, True)
+      self.Afile.writeat('SE', 0)
+      self.Bfile = openfile(self.Bfn, True)
+    else:
+      # Open mode: open existing or create with defaults
+      try:
+        self.Afile = openfile(self.Afn, False)
+      except:
+        self.Afile = openfile(self.Afn, True)
+        self.Afile.writeat('SE', 0)
+      
+      # try:
+      #   self.Bfile = openfile(self.Bfn, False)
+      # except:
+        self.Bfile = openfile(self.Bfn, True)
+        try:
+          a_content = self.Afile.readat(None, 0)
+          self.Bfile.writeat(a_content, 0)
+        except:
+          pass
+        
+  def writeat(self, data, offset):
+    """Write data to .b file at specified offset"""
+    self.lock.acquire(True)
+    try:
+      if self.closed:
+        return None
+      
+      if not isinstance(data, str):
+        return None
+      if not isinstance(offset, int) or offset < 0:
+        return None
+      
+      if self.Bfile is None:
+        return None
+      
+      # Handle EOF padding if needed
+      try:
+        current_content = self.Bfile.readat(None, 0)
+        file_size = len(current_content)
+      except:
+        file_size = 0
+      
+      # If writing past EOF, pad with spaces
+      if offset > file_size:
+        padding = ' ' * (offset - file_size)
+        self.Bfile.writeat(padding, file_size)
+      
+      self.Bfile.writeat(data, offset)
+      return len(data)
+      
+    finally:
+      self.lock.release()
+      
+  def readat(self, numbytes, offset):
+    """Read data from .a file at specified offset"""
+    self.lock.acquire(True)
+    try:
+      if not isinstance(offset, int) or offset < 0:
+        return None
+      
+      if self.Afile is None:
+        return None
+      
+      return self.Afile.readat(numbytes, offset)
+      
+    finally:
+      self.lock.release()
+      
+  def close(self):
+    """Close files and update .a if .b is valid"""
+    if self.closed:
+      return None
+    
+    self.closed = True
+    # Read .b content
+    b_content = None
+    if self.Bfile is not None:
+      try:
+        b_content = self.Bfile.readat(None, 0)
+      except:
+        try:
+          b_content = self.Bfile.readat(10**9, 0)
+        except:
+          b_content = None
+    # Close .b file
+    if self.Bfile is not None:
+      try:
+        self.Bfile.close()
+      except:
+        pass
+    
+    # Validate content (Start with 'S' and end with 'E')
+    valid = False
+    if b_content is not None and isinstance(b_content, str) and len(b_content) >= 2:
+      if b_content[0] == 'S' and b_content[-1] == 'E':
+        valid = True
+    
+    # If valid, write to .a
+    if valid:
+      try:
+        if self.Afile is not None:
+          try:
+            self.Afile.close()
+          except:
+            pass
+        
+        # Write valid content to .a
+        self.Afile = openfile(self.Afn, True)
+        self.Afile.writeat(b_content, 0)
+        self.Afile.close()
+      except:
+        pass
+    else:
+      
+      if self.Afile is not None:
+        try:
+          self.Afile.close()
+        except:
+          pass
+    
+    # Clean up .b file
+    try:
+      removefile(self.Bfn)
+    except:
+      pass
+    
+    return True
+  
+def ABopenfile(filename, create):
+  """Open or create an AB file"""
+  return ABFile(filename, create)
+
+sec_file_def = {"obj-type":ABFile,
+                "name":"ABFile",
+                "writeat":{"type":"func","args":(str,int),"exceptions":Exception,"return":(int,type(None)),"target":ABFile.writeat},
+                "readat":{"type":"func","args":((int,type(None)),int),"exceptions":Exception,"return":str,"target":ABFile.readat},
+                "close":{"type":"func","args":None,"exceptions":None,"return":(bool,type(None)),"target":ABFile.close}
+          }
+
+CHILD_CONTEXT_DEF["ABopenfile"] = {TYPE:OBJC,ARGS:(str,bool),EXCP:Exception,RETURN:sec_file_def,TARGET:ABopenfile}
+
+# Execute the user code
+secure_dispatch_module()
+
+
+
